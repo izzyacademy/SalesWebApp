@@ -1,7 +1,9 @@
-// Adapted from https://blog.logrocket.com/data-visualization-angular-d3/
-
 import { Component, OnInit } from '@angular/core';
 import * as d3 from 'd3';
+import {DepartmentSalesReportForDate} from '../models/report-response';
+import {ReportService} from '../report.service';
+import {ActivatedRoute, Params, Router} from '@angular/router';
+import {ErrorMessage} from '../models/errors';
 
 @Component({
   selector: 'app-bar-report',
@@ -10,25 +12,66 @@ import * as d3 from 'd3';
 })
 export class BarReportComponent implements OnInit {
 
-  private dataUrl = 'http://localhost:8080/departments/sales/2020-11-01';
-
   private svg;
   private margin = 50;
   private width = 750 - (this.margin * 2);
   private height = 400 - (this.margin * 2);
-  constructor() { }
+
+  private isError = false;
+
+  private errorMessage;
+
+  public reportData: DepartmentSalesReportForDate[] = [];
+
+  public reportDate: string;
+
+  constructor(private service: ReportService, private router: Router, private route: ActivatedRoute) {}
 
   ngOnInit(): void {
 
+    this.loadReport();
+
+  }
+
+  public loadReport(): void {
+
+    this.route.params.subscribe(
+      (params: Params) => {
+        const dateParam: string = params.hasOwnProperty('reportDate') ? params.reportDate : '2020-11-01';
+        this.reportDate = dateParam;
+      }
+    );
+
+    this.service.getDepartmentSalesForDate(this.reportDate).subscribe(
+      (successResponse) => this.processSuccessResponse(successResponse),
+      (errorResponse) => this.processErrorResponse(errorResponse),
+      () => this.paintReport()
+    );
+  }
+
+  private processSuccessResponse(response): void {
+    this.reportData = response.body;
+
+  }
+
+  public processErrorResponse(response: any): void {
+
+    const errorObject = response.error as ErrorMessage;
+
+    this.isError = true;
+    this.errorMessage = errorObject.errorMessage;
+  }
+
+  private paintReport(): void {
+
     this.createSvg();
 
-    // @ts-ignore
-    d3.json(this.dataUrl).then(data => this.drawBars(data));
+    this.drawBars(this.reportData);
   }
 
   private createSvg(): void {
 
-    this.svg = d3.select('figure#bar')
+    this.svg = d3.select('figure#barcharts')
       .append('svg')
       .attr('width', this.width + (this.margin * 2))
       .attr('height', this.height + (this.margin * 2))
@@ -36,7 +79,7 @@ export class BarReportComponent implements OnInit {
       .attr('transform', 'translate(' + this.margin + ',' + this.margin + ')');
   }
 
-  private drawBars(data: any[]): void {
+  private drawBars(data: DepartmentSalesReportForDate[]): void {
     // Create the X-axis band scale
     const x = d3.scaleBand()
       .range([0, this.width])
@@ -69,6 +112,6 @@ export class BarReportComponent implements OnInit {
       .attr('y', d => y(d.orderTotal))
       .attr('width', x.bandwidth())
       .attr('height', (d) => this.height - y(d.orderTotal))
-      .attr('fill', '#d04a35');
+      .attr('fill', 'maroon');
   }
 }
